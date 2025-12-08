@@ -18,11 +18,22 @@ bundle install
 
 ## Configuration
 
-Set the following environment variables for API authentication:
+### Via environment variables
 
 ```bash
 export FX_CLIENT_ID=your_client_id
 export FX_CLIENT_SECRET=your_client_secret
+```
+
+### Via initializer (Rails)
+
+```ruby
+# config/initializers/money_fluence_exchange.rb
+Money::Fluence::Exchange.configure do |config|
+  config.client_id = 'your_client_id'
+  config.client_secret = 'your_client_secret'
+  config.base_url = 'https://fx.knowledge.appvision.fr' # optional, default value
+end
 ```
 
 ## Usage
@@ -30,9 +41,7 @@ export FX_CLIENT_SECRET=your_client_secret
 ### Basic setup
 
 ```ruby
-require 'money'
-require 'money/bank/fluence_exchange'
-require 'money/rates_store/fluence'
+require 'money/fluence/exchange'
 
 # Configure Money with Fluence bank and store
 Money.default_bank = Money::Bank::FluenceExchange.new(Money::RatesStore::Fluence.new)

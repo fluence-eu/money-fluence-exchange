@@ -79,7 +79,7 @@ class Money
 
       private
 
-      FX_URL = 'https://fx.knowledge.appvision.fr'
+      FX_URL = Money::Fluence::Exchange.base_url
       AUTH_URL = "#{FX_URL}/oauth/token".freeze
 
       def request_rate(from, to, opts = {})
@@ -128,7 +128,11 @@ class Money
       def request_token(grant_type, refresh_token = nil)
         uri = URI.parse(AUTH_URL)
         request = Net::HTTP::Post.new(uri)
-        params = { grant_type: grant_type, client_id: ENV.fetch('FX_CLIENT_ID'), client_secret: ENV.fetch('FX_CLIENT_SECRET') }
+        params = {
+          grant_type: grant_type,
+          client_id: Money::Fluence::Exchange.client_id,
+          client_secret: Money::Fluence::Exchange.client_secret
+        }
         params.merge!(refresh_token: refresh_token) if refresh_token
         request.set_form_data(params)
 
