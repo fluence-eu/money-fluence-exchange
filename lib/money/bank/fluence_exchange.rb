@@ -142,7 +142,9 @@ class Money
 
         unless response.is_a?(Net::HTTPSuccess)
           @refresh_token = nil
-          return auth
+          return request_auth if grant_type == 'refresh_token'
+
+          raise "Error requesting token: #{response.body}"
         end
 
         data = JSON.parse(response.body)
