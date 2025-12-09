@@ -2,6 +2,7 @@
 
 class Money
   module Bank # rubocop:disable Style/Documentation
+    require 'money/bank/base'
     require 'money/bank/variable_exchange'
 
     # Custom bank for the Money gem using the Fluence FX API.
@@ -27,28 +28,15 @@ class Money
     # @see Money::Bank::VariableExchange
     # @see Money::RatesStore::Fluence
     class FluenceExchange < Money::Bank::VariableExchange
+      require 'date'
       require 'json'
       require 'net/https'
+      require 'uri'
+      require 'yaml'
 
       # Supported formats for rate import/export
-      RATE_FORMATS = [:json, :yaml].freeze
-
-      # @!attribute [rw] ttl_in_seconds
-      #   @return [Integer] OAuth token cache TTL in seconds (default: 3600)
-      attr_accessor :ttl_in_seconds
-
-      # @!attribute [r] rates_expire_at
-      #   @return [Time, nil] Expiration time for cached rates
-      attr_reader :rates_expire_at
-
-      # Initializes a new FluenceExchange instance.
-      #
-      # @param args Arguments passed to the parent class
-      # @yield Optional block passed to the parent class
-      def initialize(*args, &block)
-        super
-        self.ttl_in_seconds = 3600 # 1 hour
-      end
+      RATE_FORMATS = %i[json yaml].freeze
+      FORMAT_SERIALIZERS = { json: JSON, yaml: YAML }.freeze
 
       # Manually sets an exchange rate for a currency pair.
       #
@@ -109,7 +97,7 @@ class Money
             bank: self
           )
         else
-          raise Money::UnknownRate, "No conversion rate known for '#{from.currency.iso_code}' -> '#{to_currency}'"
+          raise Money::Bank::UnknownRate, "No conversion rate known for '#{from.currency.iso_code}' -> '#{to_currency}'"
         end
       end
 
@@ -138,6 +126,7 @@ class Money
           data.each do |key, rates|
             from, to = key.split(SERIALIZER_SEPARATOR)
             rates.each do |effective_date, rate|
+              effective_date = Date.parse(effective_date.to_s) unless effective_date.is_a?(Date)
               store.add_rate(from, to, rate, effective_date: effective_date)
             end
           end

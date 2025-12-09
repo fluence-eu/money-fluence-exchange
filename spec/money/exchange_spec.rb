@@ -1,11 +1,7 @@
 # frozen_string_literal: true
 
-RSpec.describe Money::Exchange do
-  it "has a version number" do
-    expect(Money::Exchange::VERSION).not_to be nil
-  end
-
-  it "does something useful" do
-    expect(false).to eq(true)
+RSpec.describe Money::Fluence::Exchange do
+  it 'has a version number' do
+    expect(Money::Fluence::Exchange::VERSION).not_to be_nil
   end
 end
