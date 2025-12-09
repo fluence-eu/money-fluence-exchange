@@ -117,11 +117,11 @@ class Money
       # @param opts [Hash] Additional options (currently unused)
       # @return [self] The current instance for chaining
       # @raise [Money::Bank::UnknownRateFormat] If the format is not supported
-      def import_rates(format, s, opts = {})
+      def import_rates(format, data_string, _opts = {})
         raise Money::Bank::UnknownRateFormat unless RATE_FORMATS.include?(format)
 
         store.transaction do
-          data = FORMAT_SERIALIZERS[format].load(s)
+          data = FORMAT_SERIALIZERS[format].load(data_string)
 
           data.each do |key, rates|
             from, to = key.split(SERIALIZER_SEPARATOR)
@@ -143,21 +143,11 @@ class Money
       # OAuth authentication URL
       AUTH_URL = "#{FX_URL}/oauth/token".freeze
 
-      # Performs an HTTP request to fetch a rate from the API.
+      # Executes an authenticated HTTP GET request.
       #
-      # @param from [String] ISO code of the source currency
-      # @param to [String] ISO code of the target currency
-      # @param opts [Hash] Options
-      # @option opts [Date] :effective_date Date of the rate (uses 'latest' if absent)
-      # @return [Net::HTTPResponse] HTTP response from the API
-      def request_rate(from, to, opts = {})
-        uri = URI.parse(FX_URL)
-        uri.path = if opts[:effective_date]
-                     "/v1/exchange_rates/#{from}/#{to}/#{opts[:effective_date]}"
-                   else
-                     "/v1/exchange_rates/#{from}/#{to}/latest"
-                   end
-
+      # @param uri [URI] The URI to send the request to
+      # @return [Net::HTTPResponse] The HTTP response
+      def execute_http_get_request(uri)
         request = Net::HTTP::Get.new(uri)
         request['Authorization'] = "Bearer #{request_auth}"
 
@@ -182,7 +172,16 @@ class Money
       # @param opts [Hash] Options passed to request_rate
       # @return [Array<(Numeric, Date)>, nil] Tuple [rate, effective_date] or nil on error
       def fetch_rate(from, to, opts = {})
-        response = request_rate(from.iso_code, to.iso_code, **opts)
+        from_iso_code = from.iso_code
+        to_iso_code = to.iso_code
+        uri = URI.parse(FX_URL)
+        uri.path = if opts[:effective_date]
+                     "/v1/exchange_rates/#{from_iso_code}/#{to_iso_code}/#{opts[:effective_date]}"
+                   else
+                     "/v1/exchange_rates/#{from_iso_code}/#{to_iso_code}/latest"
+                   end
+
+        response = execute_http_get_request(uri)
         return unless response.is_a?(Net::HTTPSuccess)
 
         extract_rate(response.body)
@@ -193,6 +192,64 @@ class Money
       # @return [Boolean] true if the token is expired or non-existent
       def token_expired?
         @token_expires_at.nil? || Time.now >= @token_expires_at
+      end
+
+      # Builds the parameters hash for OAuth token requests.
+      #
+      # @param grant_type [String] OAuth grant type ('client_credentials' or 'refresh_token')
+      # @param refresh_token [String, nil] Refresh token for 'refresh_token' grant type
+      # @return [Hash] Parameters hash for the token request
+      def build_token_params(grant_type, refresh_token)
+        params = {
+          grant_type: grant_type,
+          client_id: Money::Fluence::Exchange.client_id,
+          client_secret: Money::Fluence::Exchange.client_secret
+        }
+        params[:refresh_token] = refresh_token if refresh_token
+        params
+      end
+
+      # Executes an HTTP POST request with form data.
+      #
+      # @param uri [URI] The URI to send the request to
+      # @param params [Hash] Form parameters to send
+      # @return [Net::HTTPResponse] The HTTP response
+      def execute_http_post_request(uri, params)
+        request = Net::HTTP::Post.new(uri)
+        request.set_form_data(params)
+
+        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') do |http|
+          http.request(request)
+        end
+      end
+
+      # Performs an OAuth authentication request.
+      #
+      # On failure with a refresh_token, resets and retries
+      # with full authentication.
+      #
+      # @param grant_type [String] OAuth grant type ('client_credentials' or 'refresh_token')
+      # @param refresh_token [String, nil] Refresh token for 'refresh_token' grant_type
+      # @return [String] OAuth access token
+      # @raise [RuntimeError] If authentication fails
+      def request_token(grant_type, refresh_token = nil)
+        uri = URI.parse(AUTH_URL)
+        params = build_token_params(grant_type, refresh_token)
+        response = execute_http_post_request(uri, params)
+
+        unless response.is_a?(Net::HTTPSuccess)
+          @refresh_token = nil
+          return request_auth if grant_type == 'refresh_token'
+
+          raise "Error requesting token: #{response.body}"
+        end
+
+        data = JSON.parse(response.body)
+        @token = data['access_token']
+        @refresh_token = data['refresh_token']
+        @token_expires_at = Time.now + data['expires_in']
+
+        @token
       end
 
       # Handles OAuth authentication with automatic refresh.
@@ -213,45 +270,6 @@ class Money
       # @return [String] New access token
       def request_refresh
         request_token('refresh_token', @refresh_token)
-      end
-
-      # Performs an OAuth authentication request.
-      #
-      # On failure with a refresh_token, resets and retries
-      # with full authentication.
-      #
-      # @param grant_type [String] OAuth grant type ('client_credentials' or 'refresh_token')
-      # @param refresh_token [String, nil] Refresh token for 'refresh_token' grant_type
-      # @return [String] OAuth access token
-      # @raise [RuntimeError] If authentication fails
-      def request_token(grant_type, refresh_token = nil)
-        uri = URI.parse(AUTH_URL)
-        request = Net::HTTP::Post.new(uri)
-        params = {
-          grant_type: grant_type,
-          client_id: Money::Fluence::Exchange.client_id,
-          client_secret: Money::Fluence::Exchange.client_secret
-        }
-        params.merge!(refresh_token: refresh_token) if refresh_token
-        request.set_form_data(params)
-
-        response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.is_a?(URI::HTTPS)) do |http|
-          http.request(request)
-        end
-
-        unless response.is_a?(Net::HTTPSuccess)
-          @refresh_token = nil
-          return request_auth if grant_type == 'refresh_token'
-
-          raise "Error requesting token: #{response.body}"
-        end
-
-        data = JSON.parse(response.body)
-        @token = data['access_token']
-        @refresh_token = data['refresh_token']
-        @token_expires_at = Time.now + data['expires_in']
-
-        @token
       end
     end
   end

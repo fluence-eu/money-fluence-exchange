@@ -71,7 +71,7 @@ class Money
       # @yieldparam rate [Numeric] Conversion rate
       # @yieldparam effective_date [Date] Effective date of the rate
       # @return [Enumerator] If no block is given
-      def each_rate(&block)
+      def each_rate(&_block)
         return to_enum(:each_rate) unless block_given?
 
         guard.synchronize do
