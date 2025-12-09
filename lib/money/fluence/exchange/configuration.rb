@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require 'active_support/core_ext/module/attribute_accessors'
-
 class Money
   module Fluence
     module Exchange
@@ -36,18 +34,33 @@ class Money
 
         # @!attribute [rw] client_id
         #   @return [String] OAuth client ID (default: ENV['FX_CLIENT_ID'])
-        mattr_accessor :client_id
-        @@client_id = ENV['FX_CLIENT_ID']
+        def client_id
+          @client_id || ENV['FX_CLIENT_ID']
+        end
+
+        def client_id=(value)
+          @client_id = value
+        end
 
         # @!attribute [rw] client_secret
         #   @return [String] OAuth client secret (default: ENV['FX_CLIENT_SECRET'])
-        mattr_accessor :client_secret
-        @@client_secret = ENV['FX_CLIENT_SECRET']
+        def client_secret
+          @client_secret || ENV['FX_CLIENT_SECRET']
+        end
+
+        def client_secret=(value)
+          @client_secret = value
+        end
 
         # @!attribute [rw] base_url
         #   @return [String] Base URL for the Fluence FX API
-        mattr_accessor :base_url
-        @@base_url = 'https://fx.knowledge.appvision.fr'
+        def base_url
+          @base_url || 'https://fx.knowledge.appvision.fr'
+        end
+
+        def base_url=(value)
+          @base_url = value
+        end
       end
     end
   end
