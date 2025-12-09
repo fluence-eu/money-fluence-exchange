@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+## [0.3.0] - 2025-12-09
+
+- Fix environment variables (`FX_CLIENT_ID`, `FX_CLIENT_SECRET`) now read dynamically at runtime instead of at module load time
+- Remove `activesupport` dependency
+
 ## [0.2.0] - 2025-12-08
 
 - Add `Money::Fluence::Exchange::Configuration` module for flexible configuration
