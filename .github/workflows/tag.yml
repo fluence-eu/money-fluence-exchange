@@ -9,6 +9,9 @@ jobs:
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      created: ${{ steps.check.outputs.exists == 'false' }}
 
     steps:
       - uses: actions/checkout@v6
@@ -36,3 +39,13 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag ${{ steps.version.outputs.tag }}
           git push origin ${{ steps.version.outputs.tag }}
+
+  release:
+    needs: tag
+    if: needs.tag.outputs.created == 'true'
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+    permissions:
+      contents: write
+      packages: write
