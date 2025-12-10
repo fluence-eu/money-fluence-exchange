@@ -33,5 +33,5 @@ Gem::Specification.new do |spec|
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ['lib']
 
-  spec.add_dependency 'money', '~> 6.19'
+  spec.add_dependency 'money', '>= 6.19', '< 8.0'
 end
