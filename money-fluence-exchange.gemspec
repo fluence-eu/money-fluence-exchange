@@ -14,9 +14,11 @@ Gem::Specification.new do |spec|
   spec.license = 'MIT'
   spec.required_ruby_version = '>= 3.1.0'
 
+  spec.metadata['allowed_push_host'] = 'https://rubygems.pkg.github.com/fluence-eu'
   spec.metadata['homepage_uri'] = spec.homepage
   spec.metadata['source_code_uri'] = 'https://github.com/fluence-eu/money-fluence-exchange'
   spec.metadata['changelog_uri'] = 'https://github.com/fluence-eu/money-fluence-exchange/blob/main/CHANGELOG.md'
+  spec.metadata['github_repo'] = 'ssh://github.com/fluence-eu/money-fluence-exchange'
 
   # Specify which files should be added to the gem when it is released.
   # The `git ls-files -z` loads the files in the RubyGem that have been added into git.
