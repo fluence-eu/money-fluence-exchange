@@ -1,38 +1,35 @@
 name: Create Release
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Get version from gemspec
-        id: version
+      - name: Get version from tag
+        id: tag
         run: |
-          VERSION=$(grep -oP "VERSION = '\K[^']+" lib/money/fluence/exchange/version.rb)
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#v}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Check if tag already exists
-        run: |
-          if git rev-parse "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
-            echo "Tag ${{ steps.version.outputs.tag }} already exists"
-            exit 1
-          fi
 
       - name: Extract changelog for version
         id: changelog
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          # Extract content between this version header and the next version header (or end of file)
+          VERSION="${{ steps.tag.outputs.version }}"
           CHANGELOG=$(awk "/^## \[$VERSION\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md)
-          # Handle multi-line output
           {
             echo "body<<EOF"
             echo "$CHANGELOG"
@@ -42,7 +39,16 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
           body: ${{ steps.changelog.outputs.body }}
           generate_release_notes: false
+
+  publish:
+    needs: release
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+    permissions:
+      contents: write
+      packages: write
