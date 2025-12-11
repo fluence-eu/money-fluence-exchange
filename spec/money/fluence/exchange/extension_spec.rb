@@ -123,8 +123,8 @@ RSpec.describe Money::Fluence::Exchange::Extension do
 
       it 'passes rounding_method block' do
         converted = money_class.new(1085, 'USD', bank)
-        block_called = false
-        rounding_block = proc { block_called = true }
+        rounding_block_executed = false
+        rounding_block = proc { rounding_block_executed = true }
 
         expect(bank).to receive(:exchange_with) do |_m, _c, &block|
           expect(block).not_to be_nil
@@ -133,7 +133,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
         end
 
         money.to_money('USD', &rounding_block)
-        expect(block_called).to be true
+        expect(rounding_block_executed).to be true
       end
     end
   end
@@ -157,8 +157,8 @@ RSpec.describe Money::Fluence::Exchange::Extension do
 
     it 'passes rounding_method block' do
       converted = money_class.new(1085, 'USD', bank)
-      block_called = false
-      rounding_block = proc { block_called = true }
+      rounding_block_executed = false
+      rounding_block = proc { rounding_block_executed = true }
 
       expect(bank).to receive(:exchange_with) do |_m, _c, &block|
         expect(block).not_to be_nil
@@ -167,7 +167,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
       end
 
       money.as_us_dollar(&rounding_block)
-      expect(block_called).to be true
+      expect(rounding_block_executed).to be true
     end
   end
 
