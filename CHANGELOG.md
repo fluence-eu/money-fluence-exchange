@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [0.4.1] - 2025-12-11
+
+### Fixed
+
+- Fix `set_rate` and `get_rate` methods to handle nil `effective_date` without error
+
 ## [0.4.0] - 2025-12-11
 
 ### Added
