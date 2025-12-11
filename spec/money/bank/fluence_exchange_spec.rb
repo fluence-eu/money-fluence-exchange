@@ -54,6 +54,14 @@ RSpec.describe Money::Bank::FluenceExchange do
       bank.set_rate(:EUR, :USD, 1.12, effective_date: Date.today)
       expect(bank.store.get_rate('EUR', 'USD', effective_date: Date.today)).to eq(1.12)
     end
+
+    it 'handles nil effective_date without error' do
+      expect { bank.set_rate('EUR', 'USD', 1.12, effective_date: nil) }.not_to raise_error
+    end
+
+    it 'works without effective_date option' do
+      expect { bank.set_rate('EUR', 'USD', 1.12) }.not_to raise_error
+    end
   end
 
   describe '#get_rate' do
@@ -85,6 +93,25 @@ RSpec.describe Money::Bank::FluenceExchange do
       it 'fetches rate from API and caches it' do
         rate = bank.get_rate('EUR', 'USD', effective_date: Date.today)
         expect(rate).to eq(1.12)
+      end
+    end
+
+    context 'when effective_date is nil or missing' do
+      let(:http_success) { instance_double(Net::HTTPSuccess, body: rate_response.to_json) }
+      let(:auth_success) { instance_double(Net::HTTPSuccess, body: auth_response.to_json) }
+
+      before do
+        allow(http_success).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
+        allow(auth_success).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
+        allow(Net::HTTP).to receive(:start).and_return(auth_success, http_success)
+      end
+
+      it 'handles nil effective_date without error' do
+        expect { bank.get_rate('EUR', 'USD', effective_date: nil) }.not_to raise_error
+      end
+
+      it 'works without effective_date option' do
+        expect { bank.get_rate('EUR', 'USD') }.not_to raise_error
       end
     end
   end

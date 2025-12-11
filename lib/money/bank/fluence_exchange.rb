@@ -49,7 +49,9 @@ class Money
       def set_rate(from, to, rate, opts = {})
         from_currency = Money::Currency.wrap(from)
         to_currency = Money::Currency.wrap(to)
-        opts[:effective_date] = Date.parse(opts[:effective_date].to_s) unless opts[:effective_date].is_a?(Date)
+        if opts[:effective_date] && !opts[:effective_date].is_a?(Date)
+          opts[:effective_date] = Date.parse(opts[:effective_date].to_s)
+        end
 
         store.add_rate(from_currency, to_currency, rate, **opts)
       end
@@ -67,7 +69,9 @@ class Money
       def get_rate(from, to, opts = {})
         from_currency = Money::Currency.wrap(from)
         to_currency = Money::Currency.wrap(to)
-        opts[:effective_date] = Date.parse(opts[:effective_date].to_s) unless opts[:effective_date].is_a?(Date)
+        if opts[:effective_date] && !opts[:effective_date].is_a?(Date)
+          opts[:effective_date] = Date.parse(opts[:effective_date].to_s)
+        end
 
         rate = store.get_rate(from_currency, to_currency, **opts)
         return rate if rate
