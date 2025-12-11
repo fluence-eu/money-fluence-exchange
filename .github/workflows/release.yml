@@ -33,23 +33,17 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Extract changelog for version
-        id: changelog
         run: |
           VERSION="${{ steps.tag.outputs.version }}"
-          CHANGELOG=$(awk "/^## \[$VERSION\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md)
-          {
-            echo "body<<EOF"
-            echo "$CHANGELOG"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+          awk "/^## \[$VERSION\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md > release-notes.md
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: ${{ steps.tag.outputs.tag }}
-          body: ${{ steps.changelog.outputs.body }}
-          generate_release_notes: false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ steps.tag.outputs.tag }} \
+            --title "${{ steps.tag.outputs.tag }}" \
+            --notes-file release-notes.md
 
   publish:
     needs: release

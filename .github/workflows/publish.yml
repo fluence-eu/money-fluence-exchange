@@ -39,7 +39,6 @@ jobs:
         run: gem push --key github --host https://rubygems.pkg.github.com/fluence-eu money-fluence-exchange-*.gem
 
       - name: Attach gem to release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ inputs.tag }}
-          files: money-fluence-exchange-*.gem
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ inputs.tag }} money-fluence-exchange-*.gem --clobber
