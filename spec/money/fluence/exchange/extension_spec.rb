@@ -126,7 +126,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
         block_called = false
         rounding_block = proc { block_called = true }
 
-        expect(bank).to receive(:exchange_with) do |m, c, &block|
+        expect(bank).to receive(:exchange_with) do |_m, _c, &block|
           expect(block).not_to be_nil
           block.call
           converted
@@ -160,7 +160,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
       block_called = false
       rounding_block = proc { block_called = true }
 
-      expect(bank).to receive(:exchange_with) do |m, c, &block|
+      expect(bank).to receive(:exchange_with) do |_m, _c, &block|
         expect(block).not_to be_nil
         block.call
         converted
@@ -232,7 +232,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
         block_called = false
         rounding_block = proc { block_called = true }
 
-        expect(bank).to receive(:exchange_with) do |m, c, &block|
+        expect(bank).to receive(:exchange_with) do |_m, _c, &block|
           expect(block).not_to be_nil
           block.call
           converted
