@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.4.0] - 2025-12-11
+
 ### Added
 
 - Add `Money::Fluence::Exchange::Extension` module with enhanced Money instance methods
@@ -8,6 +10,7 @@
 - Add `as_us_dollar`, `as_ca_dollar`, `as_euro` overrides with `effective_date` support
 - Add dynamic `as_XXX` methods via `method_missing` for any currency (e.g., `as_gbp`, `as_jpy`, `as_chf`)
 - Add `respond_to_missing?` for proper method introspection on dynamic `as_XXX` methods
+- Add comprehensive test suite for `Extension` module (28 specs)
 
 ### Changed
 
