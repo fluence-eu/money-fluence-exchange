@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+## [0.4.2] - 2025-12-11
+
+### Fixed
+
+- Add missing gem entry point file `lib/money-fluence-exchange.rb` so the Extension module is properly loaded
+- Use `prepend` instead of `include` for Extension module so methods correctly override Money's originals
+
 ## [0.4.1] - 2025-12-11
 
 ### Fixed

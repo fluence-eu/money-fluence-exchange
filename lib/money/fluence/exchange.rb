@@ -253,4 +253,4 @@ end
 require 'money/bank/fluence_exchange'
 require 'money/rates_store/fluence'
 
-Money.include Money::Fluence::Exchange::Extension
+Money.prepend Money::Fluence::Exchange::Extension
