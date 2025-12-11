@@ -45,8 +45,8 @@ RSpec.describe Money::Fluence::Exchange::Extension do
 
       it 'passes rounding_method block to bank' do
         converted = money_class.new(1085, 'USD', bank)
-        block_called = false
-        rounding_block = proc { block_called = true }
+        rounding_block_executed = false
+        rounding_block = proc { rounding_block_executed = true }
 
         expect(bank).to receive(:exchange_with) do |m, c, &block|
           expect(m).to eq(money)
@@ -57,7 +57,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
         end
 
         money.exchange_to('USD', &rounding_block)
-        expect(block_called).to be true
+        expect(rounding_block_executed).to be true
       end
     end
 
