@@ -1,5 +1,21 @@
 ## [Unreleased]
 
+## [0.4.0] - 2025-12-11
+
+### Added
+
+- Add `Money::Fluence::Exchange::Extension` module with enhanced Money instance methods
+- Add `exchange_to` method with `effective_date` and `rounding_method` support
+- Add `to_money` override with `effective_date` and `rounding_method` support
+- Add `as_us_dollar`, `as_ca_dollar`, `as_euro` overrides with `effective_date` support
+- Add dynamic `as_XXX` methods via `method_missing` for any currency (e.g., `as_gbp`, `as_jpy`, `as_chf`)
+- Add `respond_to_missing?` for proper method introspection on dynamic `as_XXX` methods
+- Add comprehensive test suite for `Extension` module (28 specs)
+
+### Changed
+
+- Use `bank` accessor instead of `@bank` instance variable for better encapsulation
+
 ## [0.3.0] - 2025-12-09
 
 - Fix environment variables (`FX_CLIENT_ID`, `FX_CLIENT_SECRET`) now read dynamically at runtime instead of at module load time
