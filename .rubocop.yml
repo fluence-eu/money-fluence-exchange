@@ -15,3 +15,7 @@ Metrics/MethodLength:
 
 Metrics/BlockLength:
   Enabled: false
+
+Naming/FileName:
+  Exclude:
+    - 'lib/money-fluence-exchange.rb'
