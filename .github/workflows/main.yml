@@ -10,6 +10,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     name: Ruby ${{ matrix.ruby }}
     strategy:
       matrix:
