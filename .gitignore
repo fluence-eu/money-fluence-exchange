@@ -9,3 +9,9 @@
 
 # rspec failure tracking
 .rspec_status
+
+# IDE
+.idea/
+
+# Gem lockfile (not needed for gems)
+Gemfile.lock
