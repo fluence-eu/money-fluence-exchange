@@ -9,7 +9,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
   let(:jpy) { Money::Currency.find('JPY') }
 
   # Create a test class that includes the Extension module
-  let(:money_class) do
+  let(:test_money_class) do
     Class.new do
       include Money::Fluence::Exchange::Extension
 
@@ -23,12 +23,12 @@ RSpec.describe Money::Fluence::Exchange::Extension do
     end
   end
 
-  let(:money) { money_class.new(1000, 'EUR', bank) }
+  let(:money) { test_money_class.new(1000, 'EUR', bank) }
 
   describe '#exchange_to' do
     context 'when converting to a different currency' do
       it 'calls bank.exchange_with' do
-        converted = money_class.new(1085, 'USD', bank)
+        converted = test_money_class.new(1085, 'USD', bank)
         expect(bank).to receive(:exchange_with).with(money, usd).and_return(converted)
 
         result = money.exchange_to('USD')
@@ -37,14 +37,14 @@ RSpec.describe Money::Fluence::Exchange::Extension do
 
       it 'passes effective_date option to bank' do
         date = Date.new(2024, 1, 15)
-        converted = money_class.new(1050, 'USD', bank)
+        converted = test_money_class.new(1050, 'USD', bank)
         expect(bank).to receive(:exchange_with).with(money, usd, effective_date: date).and_return(converted)
 
         money.exchange_to('USD', effective_date: date)
       end
 
       it 'passes rounding_method block to bank' do
-        converted = money_class.new(1085, 'USD', bank)
+        converted = test_money_class.new(1085, 'USD', bank)
         rounding_block_executed = false
         rounding_block = proc { rounding_block_executed = true }
 
@@ -71,14 +71,14 @@ RSpec.describe Money::Fluence::Exchange::Extension do
     end
 
     it 'accepts currency as Symbol' do
-      converted = money_class.new(1085, 'USD', bank)
+      converted = test_money_class.new(1085, 'USD', bank)
       expect(bank).to receive(:exchange_with).with(money, usd).and_return(converted)
 
       money.exchange_to(:usd)
     end
 
     it 'accepts currency as Currency object' do
-      converted = money_class.new(1085, 'USD', bank)
+      converted = test_money_class.new(1085, 'USD', bank)
       expect(bank).to receive(:exchange_with).with(money, usd).and_return(converted)
 
       money.exchange_to(usd)
@@ -106,7 +106,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
 
     context 'when given_currency is different' do
       it 'calls exchange_to' do
-        converted = money_class.new(1085, 'USD', bank)
+        converted = test_money_class.new(1085, 'USD', bank)
         expect(bank).to receive(:exchange_with).with(money, usd).and_return(converted)
 
         result = money.to_money('USD')
@@ -115,14 +115,14 @@ RSpec.describe Money::Fluence::Exchange::Extension do
 
       it 'passes effective_date option' do
         date = Date.new(2024, 6, 1)
-        converted = money_class.new(1050, 'USD', bank)
+        converted = test_money_class.new(1050, 'USD', bank)
         expect(bank).to receive(:exchange_with).with(money, usd, effective_date: date).and_return(converted)
 
         money.to_money('USD', effective_date: date)
       end
 
       it 'passes rounding_method block' do
-        converted = money_class.new(1085, 'USD', bank)
+        converted = test_money_class.new(1085, 'USD', bank)
         rounding_block_executed = false
         rounding_block = proc { rounding_block_executed = true }
 
@@ -140,7 +140,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
 
   describe '#as_us_dollar' do
     it 'converts to USD' do
-      converted = money_class.new(1085, 'USD', bank)
+      converted = test_money_class.new(1085, 'USD', bank)
       expect(bank).to receive(:exchange_with).with(money, usd).and_return(converted)
 
       result = money.as_us_dollar
@@ -149,14 +149,14 @@ RSpec.describe Money::Fluence::Exchange::Extension do
 
     it 'passes effective_date option' do
       date = Date.new(2024, 1, 15)
-      converted = money_class.new(1050, 'USD', bank)
+      converted = test_money_class.new(1050, 'USD', bank)
       expect(bank).to receive(:exchange_with).with(money, usd, effective_date: date).and_return(converted)
 
       money.as_us_dollar(effective_date: date)
     end
 
     it 'passes rounding_method block' do
-      converted = money_class.new(1085, 'USD', bank)
+      converted = test_money_class.new(1085, 'USD', bank)
       rounding_block_executed = false
       rounding_block = proc { rounding_block_executed = true }
 
@@ -173,7 +173,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
 
   describe '#as_ca_dollar' do
     it 'converts to CAD' do
-      converted = money_class.new(1450, 'CAD', bank)
+      converted = test_money_class.new(1450, 'CAD', bank)
       expect(bank).to receive(:exchange_with).with(money, cad).and_return(converted)
 
       result = money.as_ca_dollar
@@ -182,7 +182,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
 
     it 'passes effective_date option' do
       date = Date.new(2024, 1, 15)
-      converted = money_class.new(1400, 'CAD', bank)
+      converted = test_money_class.new(1400, 'CAD', bank)
       expect(bank).to receive(:exchange_with).with(money, cad, effective_date: date).and_return(converted)
 
       money.as_ca_dollar(effective_date: date)
@@ -190,10 +190,10 @@ RSpec.describe Money::Fluence::Exchange::Extension do
   end
 
   describe '#as_euro' do
-    let(:money) { money_class.new(1000, 'USD', bank) }
+    let(:money) { test_money_class.new(1000, 'USD', bank) }
 
     it 'converts to EUR' do
-      converted = money_class.new(920, 'EUR', bank)
+      converted = test_money_class.new(920, 'EUR', bank)
       expect(bank).to receive(:exchange_with).with(money, eur).and_return(converted)
 
       result = money.as_euro
@@ -202,7 +202,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
 
     it 'passes effective_date option' do
       date = Date.new(2024, 1, 15)
-      converted = money_class.new(900, 'EUR', bank)
+      converted = test_money_class.new(900, 'EUR', bank)
       expect(bank).to receive(:exchange_with).with(money, eur, effective_date: date).and_return(converted)
 
       money.as_euro(effective_date: date)
@@ -212,7 +212,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
   describe 'dynamic as_XXX methods via method_missing' do
     describe '#as_gbp' do
       it 'converts to GBP' do
-        converted = money_class.new(860, 'GBP', bank)
+        converted = test_money_class.new(860, 'GBP', bank)
         expect(bank).to receive(:exchange_with).with(money, gbp).and_return(converted)
 
         result = money.as_gbp
@@ -221,14 +221,14 @@ RSpec.describe Money::Fluence::Exchange::Extension do
 
       it 'passes effective_date option' do
         date = Date.new(2024, 1, 15)
-        converted = money_class.new(850, 'GBP', bank)
+        converted = test_money_class.new(850, 'GBP', bank)
         expect(bank).to receive(:exchange_with).with(money, gbp, effective_date: date).and_return(converted)
 
         money.as_gbp(effective_date: date)
       end
 
       it 'passes rounding_method block' do
-        converted = money_class.new(860, 'GBP', bank)
+        converted = test_money_class.new(860, 'GBP', bank)
         rounding_block_executed = false
         rounding_block = proc { rounding_block_executed = true }
 
@@ -245,7 +245,7 @@ RSpec.describe Money::Fluence::Exchange::Extension do
 
     describe '#as_jpy' do
       it 'converts to JPY' do
-        converted = money_class.new(160_000, 'JPY', bank)
+        converted = test_money_class.new(160_000, 'JPY', bank)
         expect(bank).to receive(:exchange_with).with(money, jpy).and_return(converted)
 
         result = money.as_jpy
