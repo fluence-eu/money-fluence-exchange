@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [0.5.0] - 2026-02-23
+
+### Changed
+
+- Update `money` dependency from `~> 6.19` to `~> 7.0`
+
 ## [0.4.2] - 2025-12-11
 
 ### Fixed
