@@ -6,7 +6,7 @@ class Money
       # Current version of the money-fluence-exchange gem.
       #
       # @return [String] Semantic version string
-      VERSION = '0.6.0'
+      VERSION = '0.7.0'
     end
   end
 end
