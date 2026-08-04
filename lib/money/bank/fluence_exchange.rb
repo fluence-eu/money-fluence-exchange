@@ -51,6 +51,12 @@ class Money
       # surface rather than degrade.
       AuthenticationError = Class.new(Error)
 
+      # The FX service answered, but not in a form this bank can read. Distinct from a
+      # ConnectionError: the service is reachable, so retrying the same request is unlikely to
+      # help. Callers should not have to know the payload is JSON, nor rescue JSON::ParserError
+      # on this bank's behalf.
+      ResponseError = Class.new(Error)
+
       # The transport failures Net::HTTP surfaces, translated into {ConnectionError}. Without
       # this a caller has to know that a refused socket, an expired TLS handshake and a read
       # timeout are all the same thing to it.
@@ -186,9 +192,22 @@ class Money
       #
       # @param data [String] JSON response body
       # @return [Array<(Numeric, Date)>] Tuple [rate, effective_date]
+      # @raise [ResponseError] If the body cannot be read
       def extract_rate(data)
-        payload = JSON.parse(data)
-        [payload['rate'], Date.parse(payload['effective_date'])]
+        with_response_errors do
+          payload = JSON.parse(data)
+          [payload['rate'], Date.parse(payload['effective_date'])]
+        end
+      end
+
+      # Runs +block+, translating a response this bank cannot parse into {ResponseError}.
+      #
+      # @return [Object] whatever the block returns
+      # @raise [ResponseError] If the response cannot be read
+      def with_response_errors
+        yield
+      rescue JSON::ParserError, Date::Error, TypeError => e
+        raise ResponseError, "#{e.class}: #{e.message}"
       end
 
       # Fetches a rate from the API and parses it.
@@ -284,7 +303,14 @@ class Money
           raise AuthenticationError, "Error requesting token: #{response.body}"
         end
 
-        data = JSON.parse(response.body)
+        store_token(with_response_errors { JSON.parse(response.body) })
+      end
+
+      # Caches the access token, its refresh token and its expiry.
+      #
+      # @param data [Hash] Parsed authentication payload
+      # @return [String] OAuth access token
+      def store_token(data)
         @token = data['access_token']
         @refresh_token = data['refresh_token']
         @token_expires_at = Time.now + data['expires_in']

@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+### Added
+
+- `Money::Bank::FluenceExchange::ResponseError`, raised when the service answers something the bank cannot read. Distinct from `ConnectionError`: the service is reachable, so retrying the same request is unlikely to help
+
+### Changed
+
+- **Breaking:** an unreadable response body or `effective_date` now raises `ResponseError` instead of letting `JSON::ParserError` or `Date::Error` surface raw. A caller rescuing those must rescue `ResponseError` (or `Error`) instead — and no longer needs to know the payload is JSON
+
 ## [0.6.0] - 2026-08-04
 
 ### Added

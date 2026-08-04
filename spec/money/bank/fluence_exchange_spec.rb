@@ -258,10 +258,46 @@ RSpec.describe Money::Bank::FluenceExchange do
   # families are named here so it can tell "the service is down" from "the credentials are
   # wrong" — the first resolves itself, the second does not.
   describe 'error types' do
-    it 'exposes AuthenticationError and ConnectionError under a shared Error' do
+    let(:auth_success) { instance_double(Net::HTTPSuccess, body: auth_response.to_json) }
+
+    before { allow(auth_success).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true) }
+
+    def http_success(body)
+      instance_double(Net::HTTPSuccess, body: body).tap do |response|
+        allow(response).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
+      end
+    end
+
+    it 'exposes its errors under a shared Error' do
       expect(described_class::AuthenticationError.ancestors).to include(described_class::Error)
       expect(described_class::ConnectionError.ancestors).to include(described_class::Error)
+      expect(described_class::ResponseError.ancestors).to include(described_class::Error)
       expect(described_class::Error.ancestors).to include(StandardError)
+    end
+
+    # A reachable service answering something unreadable is neither a missing rate nor an outage.
+    # Left raw, a caller had to rescue JSON::ParserError — which means knowing this bank speaks
+    # JSON, none of its business.
+    it 'translates an unreadable rate response into ResponseError' do
+      allow(Net::HTTP).to receive(:start).and_return(auth_success, http_success('<html>502</html>'))
+
+      expect { bank.get_rate('EUR', 'USD', effective_date: Date.today) }
+        .to raise_error(described_class::ResponseError, /JSON::ParserError/)
+    end
+
+    it 'translates an unreadable token response into ResponseError' do
+      allow(Net::HTTP).to receive(:start).and_return(http_success('<html>502</html>'))
+
+      expect { bank.get_rate('EUR', 'USD', effective_date: Date.today) }
+        .to raise_error(described_class::ResponseError, /JSON::ParserError/)
+    end
+
+    it 'translates an unparseable effective_date into ResponseError' do
+      body = { 'rate' => 1.12, 'effective_date' => 'not a date' }.to_json
+      allow(Net::HTTP).to receive(:start).and_return(auth_success, http_success(body))
+
+      expect { bank.get_rate('EUR', 'USD', effective_date: Date.today) }
+        .to raise_error(described_class::ResponseError, /Date::Error/)
     end
 
     # The concrete failures Net::HTTP actually raises, rather than the abstract parents
