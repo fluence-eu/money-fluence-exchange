@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-04
+
 ### Added
 
 - `Money::Bank::FluenceExchange::ResponseError`, raised when the service answers something the bank cannot read. Distinct from `ConnectionError`: the service is reachable, so retrying the same request is unlikely to help
