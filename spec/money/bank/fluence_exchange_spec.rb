@@ -244,6 +244,36 @@ RSpec.describe Money::Bank::FluenceExchange do
         bank.get_rate('EUR', 'USD', effective_date: Date.today)
         expect(call_count).to eq(3)
       end
+
+      it 'raises AuthenticationError when the service refuses the credentials' do
+        allow(Net::HTTP).to receive(:start).and_return(auth_failure)
+
+        expect { bank.get_rate('EUR', 'USD', effective_date: Date.today) }
+          .to raise_error(described_class::AuthenticationError, /Error requesting token/)
+      end
+    end
+  end
+
+  # A caller cannot degrade sensibly on transport failures it has to enumerate itself. Both
+  # families are named here so it can tell "the service is down" from "the credentials are
+  # wrong" — the first resolves itself, the second does not.
+  describe 'error types' do
+    it 'exposes AuthenticationError and ConnectionError under a shared Error' do
+      expect(described_class::AuthenticationError.ancestors).to include(described_class::Error)
+      expect(described_class::ConnectionError.ancestors).to include(described_class::Error)
+      expect(described_class::Error.ancestors).to include(StandardError)
+    end
+
+    # The concrete failures Net::HTTP actually raises, rather than the abstract parents
+    # TRANSPORT_ERRORS lists — proving those parents really do cover what happens in the wild.
+    [SocketError, EOFError, Errno::ECONNREFUSED, Errno::ETIMEDOUT, Net::OpenTimeout,
+     Net::ReadTimeout, OpenSSL::SSL::SSLError].each do |transport_error|
+      it "translates #{transport_error} into ConnectionError" do
+        allow(Net::HTTP).to receive(:start).and_raise(transport_error)
+
+        expect { bank.get_rate('EUR', 'USD', effective_date: Date.today) }
+          .to raise_error(described_class::ConnectionError, /#{transport_error}/)
+      end
     end
   end
 
