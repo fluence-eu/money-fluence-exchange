@@ -303,7 +303,14 @@ class Money
           raise AuthenticationError, "Error requesting token: #{response.body}"
         end
 
-        data = with_response_errors { JSON.parse(response.body) }
+        store_token(with_response_errors { JSON.parse(response.body) })
+      end
+
+      # Caches the access token, its refresh token and its expiry.
+      #
+      # @param data [Hash] Parsed authentication payload
+      # @return [String] OAuth access token
+      def store_token(data)
         @token = data['access_token']
         @refresh_token = data['refresh_token']
         @token_expires_at = Time.now + data['expires_in']
