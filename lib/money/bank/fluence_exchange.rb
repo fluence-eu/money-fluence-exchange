@@ -38,6 +38,25 @@ class Money
       RATE_FORMATS = %i[json yaml].freeze
       FORMAT_SERIALIZERS = { json: JSON, yaml: YAML }.freeze
 
+      # Base class for every failure this bank raises on its own behalf, so a caller can catch
+      # the whole family without listing transport internals.
+      Error = Class.new(StandardError)
+
+      # The FX service could not be reached, or dropped the connection. Says nothing about the
+      # currencies asked for: the rate is merely unavailable, and a later attempt may succeed.
+      ConnectionError = Class.new(Error)
+
+      # The FX service refused the credentials. Unlike a ConnectionError this does not resolve
+      # itself — every conversion will fail until it is addressed — so callers should let it
+      # surface rather than degrade.
+      AuthenticationError = Class.new(Error)
+
+      # The transport failures Net::HTTP surfaces, translated into {ConnectionError}. Without
+      # this a caller has to know that a refused socket, an expired TLS handshake and a read
+      # timeout are all the same thing to it.
+      TRANSPORT_ERRORS = [SocketError, IOError, SystemCallError, Net::OpenTimeout,
+                          Net::ReadTimeout, Net::ProtocolError, OpenSSL::SSL::SSLError].freeze
+
       # Manually sets an exchange rate for a currency pair.
       #
       # @param from [String, Symbol, Money::Currency] Source currency
@@ -151,12 +170,15 @@ class Money
       #
       # @param uri [URI] The URI to send the request to
       # @return [Net::HTTPResponse] The HTTP response
+      # @raise [ConnectionError] If the service cannot be reached
       def execute_http_get_request(uri)
         request = Net::HTTP::Get.new(uri)
         request['Authorization'] = "Bearer #{request_auth}"
 
-        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.is_a?(URI::HTTPS)) do |http|
-          http.request(request)
+        with_connection_errors do
+          Net::HTTP.start(uri.host, uri.port, use_ssl: uri.is_a?(URI::HTTPS)) do |http|
+            http.request(request)
+          end
         end
       end
 
@@ -218,13 +240,26 @@ class Money
       # @param uri [URI] The URI to send the request to
       # @param params [Hash] Form parameters to send
       # @return [Net::HTTPResponse] The HTTP response
+      # @raise [ConnectionError] If the service cannot be reached
       def execute_http_post_request(uri, params)
         request = Net::HTTP::Post.new(uri)
         request.set_form_data(params)
 
-        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') do |http|
-          http.request(request)
+        with_connection_errors do
+          Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') do |http|
+            http.request(request)
+          end
         end
+      end
+
+      # Runs +block+, translating every transport failure into {ConnectionError}.
+      #
+      # @return [Object] whatever the block returns
+      # @raise [ConnectionError] If the service cannot be reached
+      def with_connection_errors
+        yield
+      rescue *TRANSPORT_ERRORS => e
+        raise ConnectionError, "#{e.class}: #{e.message}"
       end
 
       # Performs an OAuth authentication request.
@@ -235,7 +270,8 @@ class Money
       # @param grant_type [String] OAuth grant type ('client_credentials' or 'refresh_token')
       # @param refresh_token [String, nil] Refresh token for 'refresh_token' grant_type
       # @return [String] OAuth access token
-      # @raise [RuntimeError] If authentication fails
+      # @raise [AuthenticationError] If the service refuses the credentials
+      # @raise [ConnectionError] If the service cannot be reached
       def request_token(grant_type, refresh_token = nil)
         uri = URI.parse(AUTH_URL)
         params = build_token_params(grant_type, refresh_token)
@@ -245,7 +281,7 @@ class Money
           @refresh_token = nil
           return request_auth if grant_type == 'refresh_token'
 
-          raise "Error requesting token: #{response.body}"
+          raise AuthenticationError, "Error requesting token: #{response.body}"
         end
 
         data = JSON.parse(response.body)

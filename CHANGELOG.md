@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+### Added
+
+- `Money::Bank::FluenceExchange::Error`, with `ConnectionError` and `AuthenticationError` subclasses, so a caller can tell a service it cannot reach from credentials it was refused — the first resolves itself, the second does not
+
+### Changed
+
+- **Breaking:** an authentication failure now raises `AuthenticationError` instead of a bare `RuntimeError`. A caller rescuing `RuntimeError` to catch it must rescue `AuthenticationError` (or `Error`) instead
+- **Breaking:** transport failures (`SocketError`, `Errno::*`, `Net::OpenTimeout`, `Net::ReadTimeout`, `Net::ProtocolError`, `OpenSSL::SSL::SSLError`, `EOFError`) are translated into `ConnectionError` instead of surfacing raw. A caller enumerating those classes itself must rescue `ConnectionError` instead
+
 ## [0.5.0] - 2026-02-23
 
 ### Changed
