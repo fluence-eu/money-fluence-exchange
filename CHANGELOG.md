@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-04
+
 ### Added
 
 - `Money::Bank::FluenceExchange::Error`, with `ConnectionError` and `AuthenticationError` subclasses, so a caller can tell a service it cannot reach from credentials it was refused — the first resolves itself, the second does not
