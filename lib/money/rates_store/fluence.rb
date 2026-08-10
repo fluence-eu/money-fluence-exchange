@@ -87,14 +87,6 @@ class Money
       # @yieldparam rate [Numeric] Conversion rate
       # @yieldparam effective_date [Date] Effective date of the rate
       # @return [Enumerator] If no block is given
-      # The dated rates held for a pair, without writing one in. +rates+ defaults its entries to
-      # a fresh hash, so reading a pair through it is what creates the pair — a lookup for a
-      # currency this store has never seen would leave an empty entry behind, and +each_rate+
-      # and the exports below would walk it.
-      def rates_for(currency_iso_from, currency_iso_to)
-        rates.fetch(rate_key_for(currency_iso_from, currency_iso_to), {})
-      end
-
       def each_rate(&_block)
         return to_enum(:each_rate) unless block_given?
 
@@ -106,6 +98,16 @@ class Money
             end
           end
         end
+      end
+
+      private
+
+      # The dated rates held for a pair, without writing one in. +rates+ defaults its entries to
+      # a fresh hash, so reading a pair through it is what creates the pair: a lookup for a
+      # currency this store has never held would leave an empty entry behind, which +each_rate+
+      # and the exports built on it would then walk.
+      def rates_for(currency_iso_from, currency_iso_to)
+        rates.fetch(rate_key_for(currency_iso_from, currency_iso_to), {})
       end
     end
   end

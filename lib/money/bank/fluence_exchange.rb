@@ -91,8 +91,8 @@ class Money
         from_currency, to_currency, opts = normalize(from, to, opts)
 
         rate = store.get_rate(from_currency, to_currency, **opts)
-        return rate unless rate.nil?
-        return nil if absence_settled?(from_currency, to_currency, opts)
+        return rate if rate
+        return nil if past?(opts[:effective_date]) && store.rate_known?(from_currency, to_currency, **opts)
 
         rate, _effective_date = fetch_rate(from_currency, to_currency, **opts)
         store.add_rate(from_currency, to_currency, rate, **opts)
@@ -165,23 +165,21 @@ class Money
       #
       # @return [Array<(Money::Currency, Money::Currency, Hash)>]
       def normalize(from, to, opts)
-        date = opts[:effective_date]
-        opts = opts.merge(effective_date: Date.parse(date.to_s)) if date && !date.is_a?(Date)
+        if opts[:effective_date] && !opts[:effective_date].is_a?(Date)
+          opts[:effective_date] = Date.parse(opts[:effective_date].to_s)
+        end
 
         [Money::Currency.wrap(from), Money::Currency.wrap(to), opts]
       end
 
-      # Whether the store holding no rate for this pair and date means the service was asked and
-      # said there is none, rather than that nobody has asked yet. Settles only for a date already
-      # past: a rate the service does not have at 9am may be published by noon, and this store
-      # lives as long as the process — an absence taken as settled on today would hold for the
-      # rest of the day. A request carrying no date asks for the latest, which is today.
+      # Whether +date+ is a day already over — which is what makes "the service has no rate for
+      # it" worth remembering. A rate is published during the day it applies to, so a past day
+      # the service has none for will not grow one, where today still might; and this store lives
+      # as long as the process, so an answer kept for today would be kept all day. A nil date
+      # asks for the latest rate, which is today's.
       #
       # @return [Boolean]
-      def absence_settled?(from, to, opts)
-        date = opts[:effective_date]
-        !date.nil? && date < Date.today && store.rate_known?(from, to, **opts)
-      end
+      def past?(date) = !date.nil? && date < Date.today
 
       # Base URL for the Fluence FX API
       FX_URL = Money::Fluence::Exchange.base_url
