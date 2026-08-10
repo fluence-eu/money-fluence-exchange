@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** a rate request answered with a non-success status is no longer read as a missing rate. Only a `404` still returns nil — the service stating the pair has no rate on that date. A `401` or `403` raises `AuthenticationError`, every other status raises `ConnectionError`. A caller reading a nil rate as "this pair has no counterpart" would otherwise clear its converted amounts on an outage or a refused credential, silently and for every conversion asked
+- **Breaking:** a token request reads its statuses the same way. A `401` or `403` still raises `AuthenticationError` (falling back to a full authentication first when a refresh token was refused), but every other status now raises `ConnectionError` instead — a token endpoint answering `503` is an outage that resolves itself, not credentials that never will, and a caller degrading on `ConnectionError` could not tell the two apart
+- The message carried by an `AuthenticationError` on a token request names the status rather than quoting the response body. A caller matching on `"Error requesting token"` must match the status instead
+
 ## [0.7.0] - 2026-08-04
 
 ### Added

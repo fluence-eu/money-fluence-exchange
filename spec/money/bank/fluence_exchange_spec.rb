@@ -25,6 +25,12 @@ RSpec.describe Money::Bank::FluenceExchange do
     end
   end
 
+  # A real response rather than a double: the bank classes an answer by its status, and
+  # Module#=== reads the true class — a double stubbing #is_a? would never be classed at all.
+  def http_response(klass, code, body = '')
+    klass.new('1.1', code, nil).tap { |response| allow(response).to receive(:body).and_return(body) }
+  end
+
   describe '#initialize' do
     it 'accepts a custom store' do
       custom_store = Money::RatesStore::Fluence.new
@@ -81,14 +87,10 @@ RSpec.describe Money::Bank::FluenceExchange do
     end
 
     context 'when rate is not cached' do
-      let(:http_success) { instance_double(Net::HTTPSuccess, body: rate_response.to_json) }
-      let(:auth_success) { instance_double(Net::HTTPSuccess, body: auth_response.to_json) }
+      let(:http_success) { http_response(Net::HTTPOK, '200', rate_response.to_json) }
+      let(:auth_success) { http_response(Net::HTTPOK, '200', auth_response.to_json) }
 
-      before do
-        allow(http_success).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
-        allow(auth_success).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
-        allow(Net::HTTP).to receive(:start).and_return(auth_success, http_success)
-      end
+      before { allow(Net::HTTP).to receive(:start).and_return(auth_success, http_success) }
 
       it 'fetches rate from API and caches it' do
         rate = bank.get_rate('EUR', 'USD', effective_date: Date.today)
@@ -97,14 +99,10 @@ RSpec.describe Money::Bank::FluenceExchange do
     end
 
     context 'when effective_date is nil or missing' do
-      let(:http_success) { instance_double(Net::HTTPSuccess, body: rate_response.to_json) }
-      let(:auth_success) { instance_double(Net::HTTPSuccess, body: auth_response.to_json) }
+      let(:http_success) { http_response(Net::HTTPOK, '200', rate_response.to_json) }
+      let(:auth_success) { http_response(Net::HTTPOK, '200', auth_response.to_json) }
 
-      before do
-        allow(http_success).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
-        allow(auth_success).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
-        allow(Net::HTTP).to receive(:start).and_return(auth_success, http_success)
-      end
+      before { allow(Net::HTTP).to receive(:start).and_return(auth_success, http_success) }
 
       it 'handles nil effective_date without error' do
         expect { bank.get_rate('EUR', 'USD', effective_date: nil) }.not_to raise_error
@@ -187,13 +185,8 @@ RSpec.describe Money::Bank::FluenceExchange do
   end
 
   describe 'OAuth authentication' do
-    let(:auth_success) { instance_double(Net::HTTPSuccess, body: auth_response.to_json) }
-    let(:rate_success) { instance_double(Net::HTTPSuccess, body: rate_response.to_json) }
-
-    before do
-      allow(auth_success).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
-      allow(rate_success).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
-    end
+    let(:auth_success) { http_response(Net::HTTPOK, '200', auth_response.to_json) }
+    let(:rate_success) { http_response(Net::HTTPOK, '200', rate_response.to_json) }
 
     it 'requests a new token when none exists' do
       allow(Net::HTTP).to receive(:start).and_return(auth_success, rate_success)
@@ -218,11 +211,7 @@ RSpec.describe Money::Bank::FluenceExchange do
     end
 
     context 'when refresh token fails' do
-      let(:auth_failure) { instance_double(Net::HTTPUnauthorized, body: 'Unauthorized') }
-
-      before do
-        allow(auth_failure).to receive(:is_a?).with(Net::HTTPSuccess).and_return(false)
-      end
+      let(:auth_failure) { http_response(Net::HTTPUnauthorized, '401', 'Unauthorized') }
 
       it 'falls back to full authentication' do
         # First call: get token (success)
@@ -249,7 +238,18 @@ RSpec.describe Money::Bank::FluenceExchange do
         allow(Net::HTTP).to receive(:start).and_return(auth_failure)
 
         expect { bank.get_rate('EUR', 'USD', effective_date: Date.today) }
-          .to raise_error(described_class::AuthenticationError, /Error requesting token/)
+          .to raise_error(described_class::AuthenticationError, /401/)
+      end
+
+      # A token request is answered by the same service as a rate request, and fails the same
+      # ways: an outage there must not read as credentials that will never work.
+      [[Net::HTTPInternalServerError, '500'], [Net::HTTPServiceUnavailable, '503']].each do |failure, code|
+        it "translates #{code} on the token request into ConnectionError" do
+          allow(Net::HTTP).to receive(:start).and_return(http_response(failure, code))
+
+          expect { bank.get_rate('EUR', 'USD', effective_date: Date.today) }
+            .to raise_error(described_class::ConnectionError, /#{code}/)
+        end
       end
     end
   end
@@ -258,15 +258,9 @@ RSpec.describe Money::Bank::FluenceExchange do
   # families are named here so it can tell "the service is down" from "the credentials are
   # wrong" — the first resolves itself, the second does not.
   describe 'error types' do
-    let(:auth_success) { instance_double(Net::HTTPSuccess, body: auth_response.to_json) }
+    let(:auth_success) { http_response(Net::HTTPOK, '200', auth_response.to_json) }
 
-    before { allow(auth_success).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true) }
-
-    def http_success(body)
-      instance_double(Net::HTTPSuccess, body: body).tap do |response|
-        allow(response).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
-      end
-    end
+    def http_success(body) = http_response(Net::HTTPOK, '200', body)
 
     it 'exposes its errors under a shared Error' do
       expect(described_class::AuthenticationError.ancestors).to include(described_class::Error)
@@ -311,17 +305,44 @@ RSpec.describe Money::Bank::FluenceExchange do
           .to raise_error(described_class::ConnectionError, /#{transport_error}/)
       end
     end
+
+    # The service stating this pair has no rate on this date is a fact about the pair, and the
+    # only non-success a caller may read as "no rate".
+    it 'reads a 404 as no rate' do
+      allow(Net::HTTP).to receive(:start).and_return(auth_success, http_response(Net::HTTPNotFound, '404'))
+
+      expect(bank.get_rate('EUR', 'USD', effective_date: Date.today)).to be_nil
+    end
+
+    # A refusal read as a missing rate empties every conversion asked of this bank, and no retry
+    # resolves it — the caller has to hear it.
+    [[Net::HTTPUnauthorized, '401'], [Net::HTTPForbidden, '403']].each do |refusal, code|
+      it "translates #{code} into AuthenticationError" do
+        allow(Net::HTTP).to receive(:start).and_return(auth_success, http_response(refusal, code))
+
+        expect { bank.get_rate('EUR', 'USD', effective_date: Date.today) }
+          .to raise_error(described_class::AuthenticationError, /#{code}/)
+      end
+    end
+
+    # A service that failed to answer is the same thing to a caller whether it dropped the socket
+    # or answered 503: it resolves itself, and the rate is merely unavailable.
+    [[Net::HTTPInternalServerError, '500'], [Net::HTTPServiceUnavailable, '503'],
+     [Net::HTTPTooManyRequests, '429']].each do |failure, code|
+      it "translates #{code} into ConnectionError" do
+        allow(Net::HTTP).to receive(:start).and_return(auth_success, http_response(failure, code))
+
+        expect { bank.get_rate('EUR', 'USD', effective_date: Date.today) }
+          .to raise_error(described_class::ConnectionError, /#{code}/)
+      end
+    end
   end
 
   describe 'API request' do
-    let(:auth_success) { instance_double(Net::HTTPSuccess, body: auth_response.to_json) }
-    let(:rate_success) { instance_double(Net::HTTPSuccess, body: rate_response.to_json) }
+    let(:auth_success) { http_response(Net::HTTPOK, '200', auth_response.to_json) }
+    let(:rate_success) { http_response(Net::HTTPOK, '200', rate_response.to_json) }
 
-    before do
-      allow(auth_success).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
-      allow(rate_success).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
-      allow(Net::HTTP).to receive(:start).and_return(auth_success, rate_success)
-    end
+    before { allow(Net::HTTP).to receive(:start).and_return(auth_success, rate_success) }
 
     it 'uses "latest" endpoint when no effective_date' do
       bank.get_rate('EUR', 'USD', effective_date: Date.today)
