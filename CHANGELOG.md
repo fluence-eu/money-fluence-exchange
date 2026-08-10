@@ -6,7 +6,7 @@
 
 ### Changed
 
-- A rate the service states does not exist (`404`) is now asked for once per pair and date instead of on every conversion. The bank consults `#rate_known?` before fetching, so a stored nil counts as an answer. Only for a date already past: a rate missing this morning may be published this afternoon, and the store lives as long as the process
+- A rate the service states does not exist (`404`) is now asked for once per pair and date instead of on every conversion. The bank consults `#rate_known?` before fetching, so a stored nil counts as an answer
 - `Money::RatesStore::Fluence#get_rate` no longer creates an entry for a pair it has never held. Reading one through the rates hash, which defaults its entries, left an empty entry behind that `#each_rate` and the exports then walked
 
 ### Changed

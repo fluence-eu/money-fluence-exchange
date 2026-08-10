@@ -352,22 +352,23 @@ RSpec.describe Money::Bank::FluenceExchange do
       end
     end
 
-    it 'asks once for a past date, whose absence of rate is settled' do
+    it 'asks once for a given date' do
       3.times { bank.get_rate('EUR', 'JPY', effective_date: Date.new(2024, 6, 15)) }
 
       expect(calls.size).to eq(2) # one authentication, one rate request
     end
 
-    it 'keeps asking for today, where a rate may still be published' do
-      3.times { bank.get_rate('EUR', 'JPY', effective_date: Date.today) }
+    it 'asks once per date' do
+      bank.get_rate('EUR', 'JPY', effective_date: Date.new(2024, 6, 15))
+      bank.get_rate('EUR', 'JPY', effective_date: Date.new(2024, 6, 16))
 
-      expect(calls.size).to eq(4) # one authentication, three rate requests
+      expect(calls.size).to eq(3) # one authentication, one rate request per date
     end
 
-    it 'keeps asking when no date is given, which asks for the latest' do
+    it 'asks once when no date is given, which asks for the latest' do
       3.times { bank.get_rate('EUR', 'JPY') }
 
-      expect(calls.size).to eq(4)
+      expect(calls.size).to eq(2)
     end
 
     it 'still raises UnknownRate on conversion' do

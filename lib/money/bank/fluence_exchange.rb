@@ -92,7 +92,7 @@ class Money
 
         rate = store.get_rate(from_currency, to_currency, **opts)
         return rate if rate
-        return nil if past?(opts[:effective_date]) && store.rate_known?(from_currency, to_currency, **opts)
+        return nil if store.rate_known?(from_currency, to_currency, **opts)
 
         rate, _effective_date = fetch_rate(from_currency, to_currency, **opts)
         store.add_rate(from_currency, to_currency, rate, **opts)
@@ -171,15 +171,6 @@ class Money
 
         [Money::Currency.wrap(from), Money::Currency.wrap(to), opts]
       end
-
-      # Whether +date+ is a day already over — which is what makes "the service has no rate for
-      # it" worth remembering. A rate is published during the day it applies to, so a past day
-      # the service has none for will not grow one, where today still might; and this store lives
-      # as long as the process, so an answer kept for today would be kept all day. A nil date
-      # asks for the latest rate, which is today's.
-      #
-      # @return [Boolean]
-      def past?(date) = !date.nil? && date < Date.today
 
       # Base URL for the Fluence FX API
       FX_URL = Money::Fluence::Exchange.base_url
