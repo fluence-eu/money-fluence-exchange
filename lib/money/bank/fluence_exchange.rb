@@ -248,13 +248,12 @@ class Money
       # @raise [AuthenticationError] If the service refused the request
       # @raise [ConnectionError] If the service failed to answer
       def rate_from(response)
-        return extract_rate(response.body) if response.is_a?(Net::HTTPSuccess)
-        return if response.is_a?(Net::HTTPNotFound)
-
-        refused = REFUSALS.any? { |status| response.is_a?(status) }
-        raise AuthenticationError, "Rate request refused: #{response.code}" if refused
-
-        raise ConnectionError, "Rate request failed: #{response.code}"
+        case response
+        when Net::HTTPSuccess then extract_rate(response.body)
+        when Net::HTTPNotFound then nil
+        when *REFUSALS then raise AuthenticationError, "Rate request refused: #{response.code}"
+        else raise ConnectionError, "Rate request failed: #{response.code}"
+        end
       end
 
       # Checks if the OAuth token has expired.
@@ -308,27 +307,40 @@ class Money
 
       # Performs an OAuth authentication request.
       #
-      # On failure with a refresh_token, resets and retries
-      # with full authentication.
+      # Statuses are read the same way a rate request reads them (see {#rate_from}): only a
+      # refusal is a credential problem. A token request answered 503 used to raise
+      # AuthenticationError too, which a caller cannot degrade on — it would treat an outage
+      # that resolves itself as credentials that never will.
       #
       # @param grant_type [String] OAuth grant type ('client_credentials' or 'refresh_token')
       # @param refresh_token [String, nil] Refresh token for 'refresh_token' grant_type
       # @return [String] OAuth access token
-      # @raise [AuthenticationError] If the service refuses the credentials
-      # @raise [ConnectionError] If the service cannot be reached
+      # @raise [AuthenticationError] If the service refused the credentials
+      # @raise [ConnectionError] If the service failed to answer
       def request_token(grant_type, refresh_token = nil)
         uri = URI.parse(AUTH_URL)
         params = build_token_params(grant_type, refresh_token)
         response = execute_http_post_request(uri, params)
 
-        unless response.is_a?(Net::HTTPSuccess)
-          @refresh_token = nil
-          return request_auth if grant_type == 'refresh_token'
-
-          raise AuthenticationError, "Error requesting token: #{response.body}"
+        case response
+        when Net::HTTPSuccess then store_token(with_response_errors { JSON.parse(response.body) })
+        when *REFUSALS then retry_without_refresh(grant_type, response)
+        else raise ConnectionError, "Token request failed: #{response.code}"
         end
+      end
 
-        store_token(with_response_errors { JSON.parse(response.body) })
+      # A refused token drops the refresh token and falls back to a full authentication, once: a
+      # refresh is refused as soon as it expires, where client credentials refused are refused
+      # for good. Only a refusal is worth retrying this way — re-authenticating around an outage
+      # just spends a second request on the same failure.
+      #
+      # @return [String] OAuth access token
+      # @raise [AuthenticationError] If the credentials themselves were refused
+      def retry_without_refresh(grant_type, response)
+        @refresh_token = nil
+        return request_auth if grant_type == 'refresh_token'
+
+        raise AuthenticationError, "Token request refused: #{response.code}"
       end
 
       # Caches the access token, its refresh token and its expiry.
