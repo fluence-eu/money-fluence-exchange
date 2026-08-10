@@ -268,6 +268,14 @@ RSpec.describe Money::Bank::FluenceExchange do
       end
     end
 
+    # The bank discriminates on the response class, which an instance_double does not answer for
+    # on its own — it fakes the interface, not the ancestry.
+    def http_failure(klass, code)
+      instance_double(klass, code: code).tap do |response|
+        allow(response).to receive(:is_a?) { |asked| klass <= asked }
+      end
+    end
+
     it 'exposes its errors under a shared Error' do
       expect(described_class::AuthenticationError.ancestors).to include(described_class::Error)
       expect(described_class::ConnectionError.ancestors).to include(described_class::Error)
@@ -309,6 +317,37 @@ RSpec.describe Money::Bank::FluenceExchange do
 
         expect { bank.get_rate('EUR', 'USD', effective_date: Date.today) }
           .to raise_error(described_class::ConnectionError, /#{transport_error}/)
+      end
+    end
+
+    # The service stating this pair has no rate on this date is a fact about the pair, and the
+    # only non-success a caller may read as "no rate".
+    it 'reads a 404 as no rate' do
+      allow(Net::HTTP).to receive(:start).and_return(auth_success, http_failure(Net::HTTPNotFound, '404'))
+
+      expect(bank.get_rate('EUR', 'USD', effective_date: Date.today)).to be_nil
+    end
+
+    # A refusal read as a missing rate empties every conversion asked of this bank, and no retry
+    # resolves it — the caller has to hear it.
+    [[Net::HTTPUnauthorized, '401'], [Net::HTTPForbidden, '403']].each do |refusal, code|
+      it "translates #{code} into AuthenticationError" do
+        allow(Net::HTTP).to receive(:start).and_return(auth_success, http_failure(refusal, code))
+
+        expect { bank.get_rate('EUR', 'USD', effective_date: Date.today) }
+          .to raise_error(described_class::AuthenticationError, /#{code}/)
+      end
+    end
+
+    # A service that failed to answer is the same thing to a caller whether it dropped the socket
+    # or answered 503: it resolves itself, and the rate is merely unavailable.
+    [[Net::HTTPInternalServerError, '500'], [Net::HTTPServiceUnavailable, '503'],
+     [Net::HTTPTooManyRequests, '429']].each do |failure, code|
+      it "translates #{code} into ConnectionError" do
+        allow(Net::HTTP).to receive(:start).and_return(auth_success, http_failure(failure, code))
+
+        expect { bank.get_rate('EUR', 'USD', effective_date: Date.today) }
+          .to raise_error(described_class::ConnectionError, /#{code}/)
       end
     end
   end

@@ -215,7 +215,10 @@ class Money
       # @param from [Money::Currency] Source currency
       # @param to [Money::Currency] Target currency
       # @param opts [Hash] Options passed to request_rate
-      # @return [Array<(Numeric, Date)>, nil] Tuple [rate, effective_date] or nil on error
+      # @return [Array<(Numeric, Date)>, nil] Tuple [rate, effective_date], or nil when the
+      #   service states the pair has no rate on that date
+      # @raise [AuthenticationError] If the service refused the request
+      # @raise [ConnectionError] If the service failed to answer
       def fetch_rate(from, to, opts = {})
         from_iso_code = from.iso_code
         to_iso_code = to.iso_code
@@ -226,11 +229,31 @@ class Money
                      "/v1/exchange_rates/#{from_iso_code}/#{to_iso_code}/latest"
                    end
 
-        response = execute_http_get_request(uri)
-        return unless response.is_a?(Net::HTTPSuccess)
-
-        extract_rate(response.body)
+        rate_from(execute_http_get_request(uri))
       end
+
+      # The rate +response+ carries, or nil when the service states the pair has none on that
+      # date — a 404, and the only answer a caller may read as "no rate". Every other non-success
+      # is raised as its own kind: read as nil they would all become a pair with no counterpart,
+      # so an outage or a refused credential would pass for a rate that legitimately does not
+      # exist — silently, and for every conversion asked.
+      #
+      # @param response [Net::HTTPResponse] The service's answer
+      # @return [Array<(Numeric, Date)>, nil] Tuple [rate, effective_date], or nil on a 404
+      # @raise [AuthenticationError] If the service refused the request
+      # @raise [ConnectionError] If the service failed to answer
+      def rate_from(response)
+        return extract_rate(response.body) if response.is_a?(Net::HTTPSuccess)
+        return if response.is_a?(Net::HTTPNotFound)
+        raise AuthenticationError, "Rate request refused: #{response.code}" if refused?(response)
+
+        raise ConnectionError, "Rate request failed: #{response.code}"
+      end
+
+      # Whether the service refused the request outright. A 401 and a 403 differ only in whose
+      # side the credential problem sits; to a caller they say the same thing — no retry
+      # resolves this.
+      def refused?(response) = response.is_a?(Net::HTTPUnauthorized) || response.is_a?(Net::HTTPForbidden)
 
       # Checks if the OAuth token has expired.
       #
