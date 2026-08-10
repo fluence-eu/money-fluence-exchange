@@ -63,6 +63,11 @@ class Money
       TRANSPORT_ERRORS = [SocketError, IOError, SystemCallError, Net::OpenTimeout,
                           Net::ReadTimeout, Net::ProtocolError, OpenSSL::SSL::SSLError].freeze
 
+      # The statuses that say the request was refused outright, rather than answered. A 401 and a
+      # 403 differ only in whose side the credential problem sits; to a caller they say the same
+      # thing — no retry resolves this, unlike everything in {TRANSPORT_ERRORS}.
+      REFUSALS = [Net::HTTPUnauthorized, Net::HTTPForbidden].freeze
+
       # Manually sets an exchange rate for a currency pair.
       #
       # @param from [String, Symbol, Money::Currency] Source currency
@@ -245,15 +250,12 @@ class Money
       def rate_from(response)
         return extract_rate(response.body) if response.is_a?(Net::HTTPSuccess)
         return if response.is_a?(Net::HTTPNotFound)
-        raise AuthenticationError, "Rate request refused: #{response.code}" if refused?(response)
+
+        refused = REFUSALS.any? { |status| response.is_a?(status) }
+        raise AuthenticationError, "Rate request refused: #{response.code}" if refused
 
         raise ConnectionError, "Rate request failed: #{response.code}"
       end
-
-      # Whether the service refused the request outright. A 401 and a 403 differ only in whose
-      # side the credential problem sits; to a caller they say the same thing — no retry
-      # resolves this.
-      def refused?(response) = response.is_a?(Net::HTTPUnauthorized) || response.is_a?(Net::HTTPForbidden)
 
       # Checks if the OAuth token has expired.
       #
