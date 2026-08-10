@@ -63,11 +63,6 @@ class Money
       TRANSPORT_ERRORS = [SocketError, IOError, SystemCallError, Net::OpenTimeout,
                           Net::ReadTimeout, Net::ProtocolError, OpenSSL::SSL::SSLError].freeze
 
-      # The statuses that say the request was refused outright, rather than answered. A 401 and a
-      # 403 differ only in whose side the credential problem sits; to a caller they say the same
-      # thing — no retry resolves this, unlike everything in {TRANSPORT_ERRORS}.
-      REFUSALS = [Net::HTTPUnauthorized, Net::HTTPForbidden].freeze
-
       # Manually sets an exchange rate for a currency pair.
       #
       # @param from [String, Symbol, Money::Currency] Source currency
@@ -251,8 +246,24 @@ class Money
         case response
         when Net::HTTPSuccess then extract_rate(response.body)
         when Net::HTTPNotFound then nil
-        when *REFUSALS then raise AuthenticationError, "Rate request refused: #{response.code}"
-        else raise ConnectionError, "Rate request failed: #{response.code}"
+        else raise failure_for(response, 'Rate request')
+        end
+      end
+
+      # The error an answer that is not the one asked for deserves. Both requests this bank makes
+      # classify their failures the same way and differ only in what they were asking for: a 401
+      # and a 403 say the credentials were refused, which no retry resolves, where every other
+      # status is the service failing to answer — which does resolve itself.
+      #
+      # @param response [Net::HTTPResponse] The service's answer
+      # @param request [String] What was asked for, as the message names it
+      # @return [Error] The error to raise, unraised
+      def failure_for(response, request)
+        case response
+        when Net::HTTPUnauthorized, Net::HTTPForbidden
+          AuthenticationError.new("#{request} refused: #{response.code}")
+        else
+          ConnectionError.new("#{request} failed: #{response.code}")
         end
       end
 
@@ -322,25 +333,23 @@ class Money
         params = build_token_params(grant_type, refresh_token)
         response = execute_http_post_request(uri, params)
 
-        case response
-        when Net::HTTPSuccess then store_token(with_response_errors { JSON.parse(response.body) })
-        when *REFUSALS then retry_without_refresh(grant_type, response)
-        else raise ConnectionError, "Token request failed: #{response.code}"
-        end
+        return store_token(with_response_errors { JSON.parse(response.body) }) if response.is_a?(Net::HTTPSuccess)
+
+        failure = failure_for(response, 'Token request')
+        return retry_in_full if failure.is_a?(AuthenticationError) && grant_type == 'refresh_token'
+
+        raise failure
       end
 
-      # A refused token drops the refresh token and falls back to a full authentication, once: a
-      # refresh is refused as soon as it expires, where client credentials refused are refused
-      # for good. Only a refusal is worth retrying this way — re-authenticating around an outage
-      # just spends a second request on the same failure.
+      # Authenticates from the credentials themselves, the refresh token having been refused —
+      # which is what an expired one looks like. Dropping it first is what stops {#request_auth}
+      # from coming straight back here, and only a refusal is worth this second request:
+      # re-authenticating around an outage spends it on the same failure.
       #
       # @return [String] OAuth access token
-      # @raise [AuthenticationError] If the credentials themselves were refused
-      def retry_without_refresh(grant_type, response)
+      def retry_in_full
         @refresh_token = nil
-        return request_auth if grant_type == 'refresh_token'
-
-        raise AuthenticationError, "Token request refused: #{response.code}"
+        request_auth
       end
 
       # Caches the access token, its refresh token and its expiry.
