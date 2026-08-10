@@ -59,7 +59,23 @@ class Money
       def get_rate(currency_iso_from, currency_iso_to, opts = {})
         guard.synchronize do
           effective_date = opts[:effective_date] || Date.today
-          rates[rate_key_for(currency_iso_from, currency_iso_to)][effective_date]
+          rates_for(currency_iso_from, currency_iso_to)[effective_date]
+        end
+      end
+
+      # Whether this pair and date have been resolved, whatever the answer was. +get_rate+
+      # cannot say: it returns nil both for a pair never asked about and for one asked about
+      # and answered with no rate, and a caller that fetches on nil re-asks the second forever.
+      #
+      # @param currency_iso_from [String, Money::Currency] Source currency
+      # @param currency_iso_to [String, Money::Currency] Target currency
+      # @param opts [Hash] Options
+      # @option opts [Date] :effective_date Effective date for the rate (default: Date.today)
+      # @return [Boolean]
+      def rate_known?(currency_iso_from, currency_iso_to, opts = {})
+        guard.synchronize do
+          effective_date = opts[:effective_date] || Date.today
+          rates_for(currency_iso_from, currency_iso_to).key?(effective_date)
         end
       end
 
@@ -71,6 +87,14 @@ class Money
       # @yieldparam rate [Numeric] Conversion rate
       # @yieldparam effective_date [Date] Effective date of the rate
       # @return [Enumerator] If no block is given
+      # The dated rates held for a pair, without writing one in. +rates+ defaults its entries to
+      # a fresh hash, so reading a pair through it is what creates the pair — a lookup for a
+      # currency this store has never seen would leave an empty entry behind, and +each_rate+
+      # and the exports below would walk it.
+      def rates_for(currency_iso_from, currency_iso_to)
+        rates.fetch(rate_key_for(currency_iso_from, currency_iso_to), {})
+      end
+
       def each_rate(&_block)
         return to_enum(:each_rate) unless block_given?
 

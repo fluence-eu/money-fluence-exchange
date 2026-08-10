@@ -72,11 +72,7 @@ class Money
       # @option opts [Date, String] :effective_date Effective date for the rate (default: today)
       # @return [Numeric] The stored rate
       def set_rate(from, to, rate, opts = {})
-        from_currency = Money::Currency.wrap(from)
-        to_currency = Money::Currency.wrap(to)
-        if opts[:effective_date] && !opts[:effective_date].is_a?(Date)
-          opts[:effective_date] = Date.parse(opts[:effective_date].to_s)
-        end
+        from_currency, to_currency, opts = normalize(from, to, opts)
 
         store.add_rate(from_currency, to_currency, rate, **opts)
       end
@@ -92,14 +88,11 @@ class Money
       # @option opts [Date, String] :effective_date Date for which to retrieve the rate
       # @return [Numeric, nil] The conversion rate or nil if not found
       def get_rate(from, to, opts = {})
-        from_currency = Money::Currency.wrap(from)
-        to_currency = Money::Currency.wrap(to)
-        if opts[:effective_date] && !opts[:effective_date].is_a?(Date)
-          opts[:effective_date] = Date.parse(opts[:effective_date].to_s)
-        end
+        from_currency, to_currency, opts = normalize(from, to, opts)
 
         rate = store.get_rate(from_currency, to_currency, **opts)
-        return rate if rate
+        return rate unless rate.nil?
+        return nil if absence_settled?(from_currency, to_currency, opts)
 
         rate, _effective_date = fetch_rate(from_currency, to_currency, **opts)
         store.add_rate(from_currency, to_currency, rate, **opts)
@@ -165,6 +158,30 @@ class Money
       end
 
       private
+
+      # +from+ and +to+ as currencies, and +opts+ carrying its +effective_date+ as a Date, so the
+      # store is only ever asked in the terms it holds them. Callers pass ISO strings, symbols and
+      # dates written as strings, indifferently.
+      #
+      # @return [Array<(Money::Currency, Money::Currency, Hash)>]
+      def normalize(from, to, opts)
+        date = opts[:effective_date]
+        opts = opts.merge(effective_date: Date.parse(date.to_s)) if date && !date.is_a?(Date)
+
+        [Money::Currency.wrap(from), Money::Currency.wrap(to), opts]
+      end
+
+      # Whether the store holding no rate for this pair and date means the service was asked and
+      # said there is none, rather than that nobody has asked yet. Settles only for a date already
+      # past: a rate the service does not have at 9am may be published by noon, and this store
+      # lives as long as the process — an absence taken as settled on today would hold for the
+      # rest of the day. A request carrying no date asks for the latest, which is today.
+      #
+      # @return [Boolean]
+      def absence_settled?(from, to, opts)
+        date = opts[:effective_date]
+        !date.nil? && date < Date.today && store.rate_known?(from, to, **opts)
+      end
 
       # Base URL for the Fluence FX API
       FX_URL = Money::Fluence::Exchange.base_url

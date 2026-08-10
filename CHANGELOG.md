@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+### Added
+
+- `Money::RatesStore::Fluence#rate_known?`, answering whether a pair and date have been resolved at all — which `#get_rate` cannot say, returning nil both for a pair never asked about and for one the service answered has no rate
+
+### Changed
+
+- A rate the service states does not exist (`404`) is now asked for once per pair and date instead of on every conversion. The bank consults `#rate_known?` before fetching, so a stored nil counts as an answer. Only for a date already past: a rate missing this morning may be published this afternoon, and the store lives as long as the process
+- `Money::RatesStore::Fluence#get_rate` no longer creates an entry for a pair it has never held. Reading one through the rates hash, which defaults its entries, left an empty entry behind that `#each_rate` and the exports then walked
+
 ### Changed
 
 - **Breaking:** a rate request answered with a non-success status is no longer read as a missing rate. Only a `404` still returns nil — the service stating the pair has no rate on that date. A `401` or `403` raises `AuthenticationError`, every other status raises `ConnectionError`. A caller reading a nil rate as "this pair has no counterpart" would otherwise clear its converted amounts on an outage or a refused credential, silently and for every conversion asked

@@ -70,6 +70,45 @@ RSpec.describe Money::RatesStore::Fluence do
       store.add_rate('EUR', 'USD', 1.12, effective_date: Date.new(2024, 1, 1))
       expect(store.get_rate('EUR', 'USD', effective_date: Date.new(2024, 6, 1))).to be_nil
     end
+
+    it 'leaves no entry behind for a pair it has never held' do
+      store.get_rate('EUR', 'JPY')
+
+      expect(store.each_rate.to_a).to be_empty
+    end
+  end
+
+  # A pair with no rate and a pair never asked about both read as nil through #get_rate, which
+  # is why this exists: only one of the two is worth asking the service about again.
+  describe '#rate_known?' do
+    it 'is true for a date holding a rate' do
+      store.add_rate('EUR', 'USD', 1.12, effective_date: Date.new(2024, 6, 15))
+
+      expect(store.rate_known?('EUR', 'USD', effective_date: Date.new(2024, 6, 15))).to be(true)
+    end
+
+    it 'is true for a date recorded as having no rate' do
+      store.add_rate('EUR', 'USD', nil, effective_date: Date.new(2024, 6, 15))
+
+      expect(store.rate_known?('EUR', 'USD', effective_date: Date.new(2024, 6, 15))).to be(true)
+      expect(store.get_rate('EUR', 'USD', effective_date: Date.new(2024, 6, 15))).to be_nil
+    end
+
+    it 'is false for a date never resolved' do
+      store.add_rate('EUR', 'USD', 1.12, effective_date: Date.new(2024, 1, 1))
+
+      expect(store.rate_known?('EUR', 'USD', effective_date: Date.new(2024, 6, 15))).to be(false)
+    end
+
+    it 'is false for a pair never resolved' do
+      expect(store.rate_known?('EUR', 'JPY', effective_date: Date.new(2024, 6, 15))).to be(false)
+    end
+
+    it 'defaults to the current date' do
+      store.add_rate('EUR', 'USD', nil)
+
+      expect(store.rate_known?('EUR', 'USD')).to be(true)
+    end
   end
 
   describe '#each_rate' do

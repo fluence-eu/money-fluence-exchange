@@ -338,6 +338,44 @@ RSpec.describe Money::Bank::FluenceExchange do
     end
   end
 
+  # A pair the service has no rate for answers 404, which #get_rate stores as nil. Read back,
+  # that nil is indistinguishable from a pair nobody has asked about yet — so without knowing
+  # the difference the bank re-asks the service on every single conversion.
+  describe 'rates the service does not have' do
+    let(:auth_success) { http_response(Net::HTTPOK, '200', auth_response.to_json) }
+    let(:calls) { [] }
+
+    before do
+      allow(Net::HTTP).to receive(:start) do
+        calls << :call
+        calls.size == 1 ? auth_success : http_response(Net::HTTPNotFound, '404')
+      end
+    end
+
+    it 'asks once for a past date, whose absence of rate is settled' do
+      3.times { bank.get_rate('EUR', 'JPY', effective_date: Date.new(2024, 6, 15)) }
+
+      expect(calls.size).to eq(2) # one authentication, one rate request
+    end
+
+    it 'keeps asking for today, where a rate may still be published' do
+      3.times { bank.get_rate('EUR', 'JPY', effective_date: Date.today) }
+
+      expect(calls.size).to eq(4) # one authentication, three rate requests
+    end
+
+    it 'keeps asking when no date is given, which asks for the latest' do
+      3.times { bank.get_rate('EUR', 'JPY') }
+
+      expect(calls.size).to eq(4)
+    end
+
+    it 'still raises UnknownRate on conversion' do
+      expect { bank.exchange_with(Money.new(10_000, 'EUR'), 'JPY', effective_date: Date.new(2024, 6, 15)) }
+        .to raise_error(Money::Bank::UnknownRate)
+    end
+  end
+
   describe 'API request' do
     let(:auth_success) { http_response(Net::HTTPOK, '200', auth_response.to_json) }
     let(:rate_success) { http_response(Net::HTTPOK, '200', rate_response.to_json) }
