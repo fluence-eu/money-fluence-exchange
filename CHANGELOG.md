@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-11
+
 ### Changed
 
 - **Breaking:** a rate request answered with a non-success status is no longer read as a missing rate. Only a `404` still returns nil — the service stating the pair has no rate on that date. A `401` or `403` raises `AuthenticationError`, every other status raises `ConnectionError`. A caller reading a nil rate as "this pair has no counterpart" would otherwise clear its converted amounts on an outage or a refused credential, silently and for every conversion asked
