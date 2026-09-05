@@ -2,7 +2,11 @@
 
 ### Added
 
-- `Money::RatesStore::FluenceCache`, keeping the rates in an ActiveSupport cache — `Rails.cache`, or anything answering `read` and `write` — instead of in the process. Every process sharing the cache shares the rates, and none holds them in memory: a year of daily rates for ten currencies costs about 16 MB per process in `Money::RatesStore::Fluence`. A cache does not list its keys, so `#each_rate`, and `Money::Bank::FluenceExchange#rates` and `#export_rates` built on it, raise `NotImplementedError` with this store
+- `Money::RatesStore::FluenceCache`, keeping the rates in an ActiveSupport cache — `Rails.cache`, or anything answering `read` and `write` — instead of in the process. Every process sharing the cache shares the rates, and none holds them in memory: a year of daily rates for ten currencies costs about 16 MB per process in `Money::RatesStore::Fluence`. A cache does not list its keys, so `#each_rate`, and `Money::Bank::FluenceExchange#rates` and `#export_rates` built on it, raise `NotImplementedError` with this store. `Marshal.dump` of the store, the bank, or a `Money` that carries it raises `NotImplementedError` too
+
+### Changed
+
+- **Breaking:** `Money::RatesStore::Fluence#marshal_dump` raises `NotImplementedError` where Ruby used to let `TypeError: can't dump hash with default proc` surface. `NotImplementedError` is a `ScriptError`, not a `StandardError`: a bare `rescue` that swallowed the `TypeError` lets it through now. No store in this gem supports Marshal
 
 ## [0.8.0] - 2026-08-11
 
