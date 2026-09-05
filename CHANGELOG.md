@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Added
+
+- `Money::RatesStore::FluenceCache`, keeping the rates in an ActiveSupport cache — `Rails.cache`, or anything answering `read` and `write` — instead of in the process. Every process sharing the cache shares the rates, and none holds them in memory: a year of daily rates for ten currencies costs about 16 MB per process in `Money::RatesStore::Fluence`. A cache does not list its keys, so `#each_rate`, and `Money::Bank::FluenceExchange#rates` and `#export_rates` built on it, raise `NotImplementedError` with this store
+
 ## [0.8.0] - 2026-08-11
 
 ### Changed

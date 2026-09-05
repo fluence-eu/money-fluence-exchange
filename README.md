@@ -47,6 +47,17 @@ require 'money/fluence/exchange'
 Money.default_bank = Money::Bank::FluenceExchange.new(Money::RatesStore::Fluence.new)
 ```
 
+### Keeping rates in Rails.cache
+
+`Money::RatesStore::Fluence` holds the rates in the process. To keep them out of it, and share them across processes and servers, hand the bank a store backed by an ActiveSupport cache instead: `Rails.cache`, or any object answering `read` and `write`.
+
+```ruby
+store = Money::RatesStore::FluenceCache.new(Rails.cache)
+Money.default_bank = Money::Bank::FluenceExchange.new(store)
+```
+
+Rates are written under keys such as `money-fluence-exchange/EUR_TO_USD/2025-01-15`. Only a cache living outside the process (Redis, memcached, Solid Cache, a file store) takes them out of memory; a `MemoryStore` keeps them in. A cache does not list its keys, so `bank.rates` and `bank.export_rates` raise `NotImplementedError` with this store. `bank.import_rates` still works.
+
 ### Currency conversion
 
 ```ruby
