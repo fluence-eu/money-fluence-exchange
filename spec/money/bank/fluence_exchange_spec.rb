@@ -355,4 +355,34 @@ RSpec.describe Money::Bank::FluenceExchange do
       expect(Net::HTTP).to have_received(:start).at_least(:once)
     end
   end
+
+  context 'with a Money::RatesStore::FluenceCache store' do
+    subject(:bank) { described_class.new(Money::RatesStore::FluenceCache.new(ActiveSupport::Cache::MemoryStore.new)) }
+
+    let(:auth_success) { http_response(Net::HTTPOK, '200', auth_response.to_json) }
+    let(:rate_success) { http_response(Net::HTTPOK, '200', rate_response.to_json) }
+
+    before { allow(Net::HTTP).to receive(:start).and_return(auth_success, rate_success) }
+
+    it 'returns the rate it fetched' do
+      expect(bank.get_rate('EUR', 'USD', effective_date: Date.today)).to eq(1.12)
+    end
+
+    it 'keeps the fetched rate in the store' do
+      bank.get_rate('EUR', 'USD', effective_date: Date.today)
+      expect(bank.store.get_rate('EUR', 'USD', effective_date: Date.today)).to eq(1.12)
+    end
+
+    it 'cannot export its rates' do
+      expect { bank.export_rates(:json) }.to raise_error(NotImplementedError)
+    end
+
+    it 'cannot be marshaled' do
+      expect { Marshal.dump(bank) }.to raise_error(NotImplementedError, /FluenceCache/)
+    end
+
+    it 'cannot marshal a Money that carries it as its bank' do
+      expect { Marshal.dump(Money.new(100, 'EUR', bank:)) }.to raise_error(NotImplementedError, /FluenceCache/)
+    end
+  end
 end

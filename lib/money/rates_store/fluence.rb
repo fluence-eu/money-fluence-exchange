@@ -63,6 +63,13 @@ class Money
         end
       end
 
+      # @raise [NotImplementedError] always
+      def marshal_dump
+        raise NotImplementedError,
+              "#{self.class} cannot be marshaled: its rates hash carries a default proc, " \
+              'which Marshal refuses and a reloaded Hash would lack'
+      end
+
       # Iterates over all stored rates.
       #
       # @yield [from, to, rate, effective_date] Block called for each rate

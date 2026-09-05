@@ -100,6 +100,12 @@ RSpec.describe Money::RatesStore::Fluence do
     end
   end
 
+  describe '#marshal_dump' do
+    it 'is not supported' do
+      expect { Marshal.dump(store) }.to raise_error(NotImplementedError, /#{described_class}/)
+    end
+  end
+
   describe 'thread safety' do
     it 'handles concurrent writes safely' do
       threads = 10.times.map do |i|

@@ -252,5 +252,6 @@ end
 
 require 'money/bank/fluence_exchange'
 require 'money/rates_store/fluence'
+require 'money/rates_store/fluence_cache'
 
 Money.prepend Money::Fluence::Exchange::Extension
