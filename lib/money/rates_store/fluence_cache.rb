@@ -6,7 +6,8 @@ class Money
     #
     # A cache shared out of process frees every process of the rates it would otherwise hold.
     # The store needs only +read+ and +write+ from it, so the gem does not depend on ActiveSupport.
-    # A cache does not list its keys, so +each_rate+ and the exports built on it are not supported.
+    # A cache does not list its keys, so +each_rate+ and the exports built on it are not supported,
+    # and neither is +Marshal.dump+.
     #
     # @example
     #   store = Money::RatesStore::FluenceCache.new(Rails.cache)
@@ -41,6 +42,9 @@ class Money
 
       # @raise [NotImplementedError] always
       def each_rate = raise(NotImplementedError, "#{self.class} cannot list its rates")
+
+      # @raise [NotImplementedError] always
+      def marshal_dump = raise(NotImplementedError, "#{self.class} cannot be marshaled: its rates live in the cache")
 
       def transaction = yield
 

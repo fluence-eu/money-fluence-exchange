@@ -71,6 +71,12 @@ RSpec.describe Money::RatesStore::FluenceCache do
     end
   end
 
+  describe '#marshal_dump' do
+    it 'is not supported' do
+      expect { Marshal.dump(store) }.to raise_error(NotImplementedError, /#{described_class}/)
+    end
+  end
+
   describe '#transaction' do
     it 'yields' do
       expect { |b| store.transaction(&b) }.to yield_control

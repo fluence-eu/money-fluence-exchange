@@ -376,5 +376,13 @@ RSpec.describe Money::Bank::FluenceExchange do
     it 'cannot export its rates' do
       expect { bank.export_rates(:json) }.to raise_error(NotImplementedError)
     end
+
+    it 'cannot be marshaled' do
+      expect { Marshal.dump(bank) }.to raise_error(NotImplementedError, /FluenceCache/)
+    end
+
+    it 'cannot marshal a Money that carries it as its bank' do
+      expect { Marshal.dump(Money.new(100, 'EUR', bank:)) }.to raise_error(NotImplementedError, /FluenceCache/)
+    end
   end
 end
