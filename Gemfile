@@ -4,6 +4,7 @@ source 'https://rubygems.org'
 
 gemspec
 
+gem 'activesupport'
 gem 'bigdecimal'
 gem 'irb'
 gem 'rake', '~> 13.0'
